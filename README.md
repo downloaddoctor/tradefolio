@@ -86,7 +86,7 @@ First-load libraries come from jsDelivr; after that the service worker serves th
 
 ## Privacy
 
-All trades, imports and cached candles live in your browser's IndexedDB. Nothing is uploaded. The only outbound requests are to jsDelivr (libraries), corsproxy.io + Yahoo Finance (candles), and Stooq. The corsproxy key is stored in `localStorage` on your device.
+All trades, imports and cached candles live in your browser's IndexedDB. Nothing is uploaded. The only outbound requests are to jsDelivr (libraries), corsproxy.io + Yahoo Finance (candles). The corsproxy key is stored in `localStorage` on your device.
 
 ## Troubleshooting
 
@@ -103,7 +103,7 @@ Upload the folder to any static host (GitHub Pages, Netlify, Cloudflare Pages, S
 
 ## Privacy
 
-All trades and cached candles stay in your browser (IndexedDB). Nothing is uploaded. Outbound requests go only to jsDelivr (libraries), corsproxy.io + Yahoo Finance (candles) and Stooq. The corsproxy key is stored in `localStorage` on your device.
+All trades and cached candles stay in your browser (IndexedDB). Nothing is uploaded. Outbound requests go only to jsDelivr (libraries), corsproxy.io + Yahoo Finance (candles). The corsproxy key is stored in `localStorage` on your device.
 
 ## Troubleshooting
 
@@ -118,7 +118,7 @@ All trades and cached candles stay in your browser (IndexedDB). Nothing is uploa
 
 - No corporate actions (splits, bonuses, demergers), so quantities may drift after such events.
 - No brokerage, taxes or charges; Value is used as given.
-- Unrealized P&L uses the last daily close from the candle cache, not a live quote.\n- Market data needs a corsproxy.io API key; without it the chart falls back to your executed prices. Stooq's CSV endpoint is often blocked by CORS and is a last resort.
+- Unrealized P&L uses the last daily close from the candle cache, not a live quote.\n- Market data needs a corsproxy.io API key; without it the chart falls back to your executed prices.
 - Intraday vs delivery trades are not distinguished.
 - Timestamps are naive; no timezone handling.
 - Tables show the first 1000 rows until Show all is clicked.
