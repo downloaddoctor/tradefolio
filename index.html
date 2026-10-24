@@ -52,7 +52,7 @@
             <div class='pop' x-show='keyOpen' @click.outside='keyOpen = false' x-transition>
               <template x-if='!hasKey'>
                 <div class='pop-row'>
-                  <input type='password' x-model='corsKey' @keydown.enter='saveCorsKey()' placeholder='corsproxy.io key' class='input' autocomplete='off'>
+                  <input type='password' x-model='keyDraft' @keydown.enter='saveCorsKey()' placeholder='corsproxy.io key' class='input' autocomplete='off'>
                   <button @click='saveCorsKey(); keyOpen = false' class='btn btn-sm btn-primary'>Save</button>
                 </div>
               </template>

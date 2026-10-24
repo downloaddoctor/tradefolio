@@ -88,7 +88,7 @@ export function app() {
     sel: null,
     get selPos() { return this.sel ? this.positions.find((p) => p.symbol === this.sel) || null : null; },
     get selTrades() { return this.sel ? this.activeTrades().filter((t) => t.symbol === this.sel) : []; },
-    corsKey: '',
+    corsKey: '', keyDraft: '',
     get hasKey() { return !!this.corsKey; },
     candles: null, mkt: '', cs: { st: 'idle', msg: '' },
     showTrades: true, closedOnly: false, hideBuys: false, hideSells: false, hideVolume: false, posFilter: 'all', posSort: 'default', fetched: {}, prices: {}, pricesBusy: false,
@@ -263,7 +263,7 @@ export function app() {
     },
     closeSymbol() { destroyChart(); this.sel = null; this.hashSym = ''; this.candles = null; this.syncHash(); },
     saveCorsKey() {
-      const k = this.corsKey.trim();
+      const k = this.keyDraft.trim(); this.keyDraft = '';
       this.corsKey = k;
       saveCorsKeyFn(k);
       this.cs = { st: k ? 'ok' : 'warn', msg: k ? 'corsproxy.io key saved' : 'No corsproxy.io key - proxy may reject requests' };
