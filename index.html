@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang='en' class='dark'>
+
+<head>
+  <meta charset='utf-8'>
+  <meta name='viewport' content='width=device-width, initial-scale=1'>
+  <meta name='color-scheme' content='dark'>
+  <meta name='theme-color' content='#050507'>
+  <meta name='description' content='Private, offline-ready trade journal. Import broker trade history, track open positions, FIFO realized P&L and daily charts. All data stays in your browser.'>
+  <meta property='og:title' content='Tradefolio'>
+  <meta property='og:description' content='Private, offline-ready trade journal with FIFO P&L and daily charts.'>
+  <meta property='og:type' content='website'>
+  <link rel='manifest' href='./manifest.webmanifest'>
+  <link rel='icon' href='./assets/favicon.svg' type='image/svg+xml'>
+  <link rel='apple-touch-icon' href='./assets/favicon.svg'>
+  <title>Tradefolio</title>
+  <link rel='preconnect' href='https://fonts.googleapis.com'>
+  <link rel='preconnect' href='https://fonts.gstatic.com' crossorigin>
+  <link
+    href='https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap'
+    rel='stylesheet'>
+  <link rel='stylesheet' href='./src/css/style.css'>
+  <script src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js'></script>
+  <script src='https://cdn.jsdelivr.net/npm/dexie@4.0.8/dist/dexie.min.js'></script>
+  <script
+    src='https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js'></script>
+  <script type='module' src='./src/js/main.js'></script>
+</head>
+
+<body x-data='app()' x-cloak>
+  <noscript>
+    <div style='padding:2rem;font-family:system-ui;color:#f4f4f6;background:#050507;min-height:100vh'>
+      <h1 style='font-size:1.25rem'>JavaScript required</h1>
+      <p style='color:#9a9aa6'>Tradefolio parses and stores your trades entirely in the browser. Please enable JavaScript to continue.</p>
+    </div>
+  </noscript>
+  <!-- app shell -->
+  <div id='app'>
+
+    <!-- header -->
+    <header id='hdr'>
+      <div class='hdr-right' x-data='headerDock'>
+        <div class='hdr-tabs'>
+          <button @click='setPane("data")' :class='showData ? "active" : ""' class='htab'>Data</button>
+          <button @click='setPane("chart")' :class='showChart ? "active" : ""' class='htab'>Chart</button>
+        </div>
+        <div class='hdr-icons'>
+          <div class='icon-wrap'>
+            <button class='icon-btn' :class='hasKey ? "on" : ""' @click='keyOpen = !keyOpen' title='Set corsproxy.io key'>
+              <svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'><circle cx='8' cy='15' r='4'/><path stroke-linecap='round' d='M10.85 12.15L19 4m-4 0l4 4m-7 3l2 2'/></svg>
+            </button>
+            <div class='pop' x-show='keyOpen' @click.outside='keyOpen = false' x-transition>
+              <template x-if='!hasKey'>
+                <div class='pop-row'>
+                  <input type='password' x-model='corsKey' @keydown.enter='saveCorsKey()' placeholder='corsproxy.io key' class='input' autocomplete='off'>
+                  <button @click='saveCorsKey(); keyOpen = false' class='btn btn-sm btn-primary'>Save</button>
+                </div>
+              </template>
+              <template x-if='hasKey'>
+                <div class='pop-row'>
+                  <span class='pop-ok'>Key set</span>
+                  <button @click='clearCorsKey()' class='btn btn-sm btn-danger'>Clear</button>
+                </div>
+              </template>
+            </div>
+          </div>
+          <button class='icon-btn' x-show='trades.length' @click='$refs.file.click()' title='Import new file'>
+            <svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'><path stroke-linecap='round' stroke-linejoin='round' d='M12 4v12m0-12l-4 4m4-4l4 4M5 20h14'/></svg>
+          </button>
+          <div class='icon-wrap'>
+            <button class='icon-btn' x-show='users.length' @click='userOpen = !userOpen' :title='userTitle'>
+              <svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'><circle cx='12' cy='8' r='4'/><path stroke-linecap='round' d='M4 21v-1a7 7 0 0114 0v1'/></svg>
+              <span class='icon-badge' x-text='userBadge'></span>
+            </button>
+            <div class='pop' x-show='userOpen' @click.outside='userOpen = false' x-transition>
+              <div class='pop-col'>
+                <button class='pop-item' :class='!user ? "active" : ""' @click='user = ""; userOpen = false'>All users</button>
+                <template x-for='u in users' :key='u'>
+                  <button class='pop-item' :class='user === u ? "active" : ""' @click='pickUser(u)' x-text='u'></button>
+                </template>
+              </div>
+            </div>
+          </div>
+          <button class='icon-btn danger' x-show='trades.length'
+            @click='clearWithConfirm()'
+            title='Clear data'>
+            <svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'><path stroke-linecap='round' d='M4 7h16M9 7V5h6v2m-8 0l1 13h8l1-13'/></svg>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <div class='shell'>
+    <input id='file-input' type='file' x-ref='file' class='file-input' accept='.xlsx,.xls,.csv'
+      @change='onFile($event)'>
+
+    <!-- drop zone -->
+    <div id='drop' x-show='!trades.length && !preview' @dragover.prevent='drag = true'
+      @dragleave.prevent='drag = false' @drop.prevent='onDrop($event)' @click='$refs.file.click()'
+      @keydown.enter='$refs.file.click()' tabindex='0' role='button'
+      :class='drag ? "drag" : ""' class='drop fade-in'>
+      <div class='drop-icon'>
+        <svg xmlns='http://www.w3.org/2000/svg' class='ico-lg' fill='none' viewBox='0 0 24 24' stroke='currentColor'
+          stroke-width='2'>
+          <path stroke-linecap='round' stroke-linejoin='round'
+            d='M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 4v12m0-12l-4 4m4-4l4 4' />
+        </svg>
+      </div>
+      <p class='drop-title'>Drop your trade history here, or click to browse</p>
+      <p class='drop-sub'>.xlsx / .xls / .csv - header row is auto-detected - data never leaves your device</p>
+      <button @click.stop='sample()' class='drop-link'>Need a template? Download sample file</button>
+    </div>
+
+    <!-- error alert -->
+    <div id='error' x-data='alertBox' x-show='error' x-transition role='alert' class='alert'>
+      <span x-text='error'></span>
+      <button @click='dismiss()' class='alert-close' aria-label='Dismiss'>&times;</button>
+    </div>
+
+    <!-- import preview -->
+    <section id='preview' x-data='importPreview' x-show='preview' class='panel fade-in'>
+      <template x-if='preview'>
+        <div class='panel-body'>
+          <div class='chips'>
+            <span class='semibold' x-text='preview.fileName'></span>
+            <span class='chip'>sheet <b x-text='preview.sheet'></b></span>
+            <span class='chip'>header row <b x-text='preview.headerRow'></b></span>
+            <span class='chip'><b x-text='preview.dataRows.length'></b> data rows</span>
+          </div>
+          <div>
+            <h3 class='sec-title'>Detected column mapping</h3>
+            <div class='map-grid'>
+              <template x-for='f in preview.mapping' :key='f.k'>
+                <div class='map-item'>
+                  <span x-text='f.label'></span>
+                  <span class='badge' :class='f.found ? "ok" : "warn"'
+                    x-text='mapText(f)'></span>
+                </div>
+              </template>
+            </div>
+          </div>
+          <div>
+            <h3 class='sec-title'>Raw preview (first rows)</h3>
+            <div class='raw-wrap'>
+              <table class='raw-table'>
+                <thead>
+                  <tr>
+                    <template x-for='h in preview.previewHead' :key='h'>
+                      <th x-text='h'></th>
+                    </template>
+                  </tr>
+                </thead>
+                <tbody>
+                  <template x-for='(r, i) in preview.previewRows' :key='i'>
+                    <tr>
+                      <template x-for='(c, j) in r' :key='j'>
+                        <td x-text='c'></td>
+                      </template>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class='actions-row'>
+            <button id='btn-confirm' @click='askUser()' class='btn btn-primary'>Confirm import</button>
+            <button id='btn-cancel' @click='cancelPreview()' class='btn'>Cancel</button>
+          </div>
+        </div>
+      </template>
+    </section>
+
+    <!-- username modal -->
+    <div id='usermodal' x-data='userModalBox' x-show='userModal' x-transition.opacity @keydown.escape.window='userModal = false'
+      @click.self='userModal = false'>
+      <div class='modal-card modal-sm'>
+        <div class='modal-head'>
+          <div>
+            <h2 class='modal-title'>Name this import</h2>
+            <p class='note'>Trades are saved under this username. Importing the same file again for the same user is rejected.</p>
+          </div>
+          <button @click='userModal = false' class='modal-close' aria-label='Close'>&times;</button>
+        </div>
+        <input id='uname' x-model='uname' list='unames' placeholder='Username' maxlength='40'
+          @keydown.enter='confirmImport()' class='input' autofocus>
+        <datalist id='unames'><template x-for='u in users' :key='u'>
+            <option :value='u'></option>
+          </template></datalist>
+        <div class='actions-row'>
+          <button @click='confirmImport()' class='btn btn-primary'>Save import</button>
+          <button @click='userModal = false' class='btn'>Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- main views -->
+    <main id='main' x-show='!preview && trades.length' class='fade-in'>
+
+      <div class='journal' x-show='showChart'>
+        <div class='side-col' x-data='positionsSide'>
+        <aside class='side'>
+          <div class='side-head'>
+            <span>Positions (<span class='side-count' x-text='sideList.length'></span>)</span>
+            <select x-model='posSort' class='input' style='padding:.2rem .4rem;font-size:.75rem'>
+                <option value='default'>Open first</option>
+                <option value='unr'>Unrealized P&amp;L</option>
+                <option value='pnl'>Total P&amp;L</option>
+                <option value='pct'>Return %</option>
+                <option value='realized'>Realized P&amp;L</option>
+                <option value='value'>Invested</option>
+                <option value='symbol'>Symbol A-Z</option>
+              </select>
+          </div>
+          <div class='chart-filters side-filters'>
+            <template x-for='f in ["all", "open", "closed"]' :key='f'>
+              <button @click='posFilter = f' :class='posFilter === f ? "active" : ""' class='btn btn-sm' x-text='filterLabel(f)'></button>
+            </template>
+          </div>
+          <div class='side-search'>
+            <input type='search' x-model.debounce.150ms='q' placeholder='Filter positions'>
+          </div>
+          <div class='side-list'>
+            <template x-for='p in sideList' :key='p.symbol'>
+              <button class='side-item' :class='sel === p.symbol ? "active" : ""' @click='pick(p.symbol)'>
+                <span class='si-sym' x-text='p.symbol'></span>
+                <span class='si-net' :class='p.net > 0 ? "pos" : "neg"' x-text='p.net'></span>
+                <span class='si-pl' :class='plClass(p)' :title='plTitle(p)' x-text='plText(p)'></span>
+              </button>
+            </template>
+            <div x-show='!sideList.length' class='side-empty'>No positions.</div>
+          </div>
+        </aside>
+        <aside class='side side-dash' x-data='summarySide' x-show='filterSummary.length'>
+          <div class='side-head'>
+            <span x-text='title'></span>
+            <span class='side-count' x-text='sideList.length'></span>
+          </div>
+          <div class='side-sum'>
+            <template x-for='r in filterSummary' :key='r[0]'>
+              <div class='sm-item'><span class='sm-l' x-text='r[0]'></span><b class='sm-v' :class='r[2]' x-text='r[1]'></b></div>
+            </template>
+          </div>
+        </aside>
+        </div>
+
+        <section class='pane'>
+          <template x-if='sel'>
+            <div class='pane-head' x-data='paneHead'>
+              <div class='pane-title-wrap'>
+                <h2 class='pane-title' x-text='sel'></h2>
+                <span class='badge' x-show='cs.msg'
+                  :class='badgeClass'
+                  :title='cs.msg' x-text='badgeText'></span>
+              </div>
+              <div class='pane-stats' x-show='selPos'>
+                <span x-show='curPrice'>Price <b x-text='priceText'></b></span>
+                <span>Qty <b x-text='selPos ? selPos.net : ""'></b></span>
+                <span>Avg buy <b x-text='avgText'></b></span>
+                <span x-show='unrealized !== null'>Unrealized <b :class='unrealized >= 0 ? "pos" : "neg"' x-text='unrText'></b></span>
+                <span>Realized <b :class='selPos && selPos.realized >= 0 ? "pos" : "neg"'
+                  x-text='realText'></b></span>
+              </div>
+              <div class='chart-filters'><button @click='toggleFilter("closedOnly")' :class='closedOnly ? "active" : ""' class='btn btn-sm'>Hide closed</button><button @click='toggleFilter("hideBuys")' :class='hideBuys ? "active" : ""' class='btn btn-sm'>Hide buys</button><button @click='toggleFilter("hideSells")' :class='hideSells ? "active" : ""' class='btn btn-sm'>Hide sells</button><button @click='toggleFilter("hideLines")' :class='hideLines ? "active" : ""' class='btn btn-sm'>Hide price lines</button><button @click='toggleFilter("hideVolume")' :class='hideVolume ? "active" : ""' class='btn btn-sm'>Hide volume</button></div>
+              <button @click='loadCandles(true)' class='btn btn-sm'>Reload</button>
+            </div>
+          </template>
+          <div id='chart' x-ref='chart'></div>
+          <div class='dash-title' x-data='statGrid' x-show='sel && selStats.length' x-text='title'></div>
+          <div class='sel-stats' x-show='sel && selStats.length'>
+            <template x-for='r in selStats' :key='r[0]'>
+              <div class='ss-item'><span class='ss-l' x-text='r[0]'></span><b class='ss-v' :class='r[2]' x-text='r[1]'></b></div>
+            </template>
+          </div>
+          <template x-if='selPos'><div class='rec-card' x-data='recoveryCard' x-show='show'>
+            <div class='dash-title' x-text='"Recovery - " + sel'></div>
+            <div class='rec-note' x-text='note'></div>
+            <table class='rec-tbl'>
+              <thead><tr><th>Buy</th><th>Add qty</th><th>Capital</th><th>Total qty</th><th>Total invested</th><th>New avg (target price)</th><th>Up needed</th></tr></thead>
+              <tbody>
+                <template x-for='r in recovery.rows' :key='r.label'>
+                  <tr>
+                    <td><b x-text='r.label'></b></td><td x-text='r.qty'></td>
+                    <td x-text='inr(r.capital)'></td><td x-text='r.newQty'></td><td x-text='inr(r.total)'></td><td x-text='inr(r.avg)'></td>
+                    
+                    <td :class='r.profit ? "pos" : "neg"' x-text='upText(r)'></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div></template>
+        </section>
+      </div>
+
+      <div x-show='showData'>
+      <!-- kpis -->
+      <div id='kpis' class='kpis' x-data='kpiCards'>
+        <div class='kpi indigo'>
+          <div class='kpi-label'>Open positions</div>
+          <div class='kpi-value' x-text='totals.openCount'></div>
+        </div>
+        <div class='kpi sky'>
+          <div class='kpi-label'>Invested (open cost)</div>
+          <div class='kpi-value' x-text='inr(totals.invested)'></div>
+        </div>
+        <div class='kpi' :class='totals.realized >= 0 ? "up" : "down"'>
+          <div class='kpi-label'>Realized P&amp;L (FIFO)</div>
+          <div class='kpi-value' :class='totals.realized >= 0 ? "pos" : "neg"'
+            x-text='realText'></div>
+        </div>
+        <div class='kpi' :class='shortN ? "down" : ""'>
+          <div class='kpi-label'>Short / anomalies</div>
+          <div class='kpi-value' :class='shortN ? "neg" : ""' x-text='shortN'></div>
+        </div>
+      </div>
+
+      <!-- warnings -->
+      <details id='warnings' class='warnbox' x-data='warningsPanel' x-show='warningCount()'>
+        <summary>Import warnings (<span x-text='warningCount()'></span>)</summary>
+        <ul>
+          <li x-show='stats.empty'><span x-text='stats.empty'></span> empty rows skipped</li>
+          <li x-show='stats.skippedStatusTotal'>
+            <span x-text='stats.skippedStatusTotal'></span> rows skipped because order status was not Executed:
+            <span x-text='statusSummary()'></span>
+          </li>
+          <li x-show='stats.invalid.length'>
+            <span x-text='stats.invalid.length'></span> malformed rows skipped (bad date, number, or type):
+            <span x-text='invalidSummary()'></span>
+          </li>
+          <li x-show='stats.dupRows'>
+            <span x-text='stats.dupRows'></span> rows repeat an earlier Exchange Order Id (partial fills can
+            legitimately share an id).
+            <label><input type='checkbox' x-model='dedupe'> Remove duplicates</label>
+          </li>
+          <li x-show='shortN'>
+            <span x-text='shortN'></span> symbol(s) have more sells than buys (SHORT) - check for missing earlier
+            history.
+            <label><input type='checkbox' x-model='hideShort'> Exclude SHORT symbols from view</label>
+            <div class='fix-list'>
+              <template x-for='s in shortList' :key='s.symbol'>
+                <div class='fix-row'>
+                  <b x-text='s.symbol'></b>
+                  <span x-text='"missing " + s.missing + " qty"'></span>
+                  <input type='number' step='any' min='0' x-model.number='fixPrice[s.symbol]' :placeholder='"buy price " + s.guess' class='input input-ticker'>
+                  <button class='btn btn-sm' @click='fixShort(s.symbol)'>Add opening balance</button>
+                </div>
+              </template>
+              <button class='btn btn-sm' @click='fixAllShorts()'>Fix all</button>
+            </div>
+          </li>
+        </ul>
+      </details>
+
+      <!-- insights -->
+      <details id='insights' open class='summary-box' x-data='insightsPanel' x-show='insights.length'>
+        <summary>Insights</summary>
+        <ul class='ins-list'>
+          <template x-for='(i, n) in insights' :key='n'>
+            <li class='ins-item' :class='i.tone'><span class='ins-ic' x-text='icon(i)'></span><span class='ins-tx' x-text='i.text'></span></li>
+          </template>
+        </ul>
+      </details>
+
+      <!-- data summary -->
+      <details id='data-summary' open class='summary-box' x-data='dataSummary'>
+        <summary>Data summary</summary>
+        <div class='stat-grid'>
+          <template x-for='i in overview' :key='i[0]'>
+            <div class='stat'>
+              <div class='stat-label' x-text='i[0]'></div>
+              <div class='stat-value' :class='toneClass(i)'
+                x-text='i[1]'></div>
+            </div>
+          </template>
+        </div>
+      </details>
+
+      <!-- tabs + export -->
+      <div class='bar' x-data='dataTabs'>
+        <div id='tabs' class='tabs' role='tablist'>
+          <template x-for='t in tabs' :key='t.k'>
+            <button @click='view = t.k' role='tab' :aria-selected='view === t.k'
+              :class='view === t.k ? "active" : ""' class='tab'>
+              <span x-text='t.label'></span>
+              <span class='tab-count'
+                x-text='tabCount(t)'></span>
+            </button>
+          </template>
+        </div>
+        <div id='export' class='export'>
+          <button @click='exportView("csv")' class='btn'>Export CSV</button>
+          <button @click='exportView("xlsx")' class='btn'>Export XLSX</button>
+        </div>
+      </div>
+
+      <!-- filters -->
+      <div id='toolbar' class='toolbar' x-data='dataToolbar'>
+        <div class='search'>
+          <svg xmlns='http://www.w3.org/2000/svg' class='ico-sm' fill='none' viewBox='0 0 24 24'
+            stroke='currentColor' stroke-width='2'>
+            <path stroke-linecap='round' stroke-linejoin='round'
+              d='M21 21l-4.35-4.35M17 10.5a6.5 6.5 0 11-13 0 6.5 6.5 0 0113 0z' />
+          </svg>
+          <input type='search' x-model.debounce.150ms='q' placeholder='Search symbol / stock name'>
+        </div>
+        <template x-if="view === 'trades'">
+          <div id='filters' class='filters'>
+            <select x-model='fType' class='select'>
+              <option value=''>All types</option>
+              <option value='BUY'>BUY</option>
+              <option value='SELL'>SELL</option>
+            </select>
+            <select x-model='fSym' class='select'>
+              <option value=''>All symbols</option>
+              <template x-for='s in symbolList' :key='s'>
+                <option :value='s' x-text='s'></option>
+              </template>
+            </select>
+            <label class='date-label'>From <input type='date' x-model='dFrom'></label>
+            <label class='date-label'>To <input type='date' x-model='dTo'></label>
+            <button @click='resetFilters()' class='btn'>Reset</button>
+          </div>
+        </template>
+        <div id='count-info' class='count-info'>
+          <span x-text='rows.length'></span> rows
+          <span x-show='view === "summary"'> - total realized P&amp;L <b x-text='inr(totals.realized)'></b></span><span
+            x-show='view === "open"'> - open qty <b x-text='openSum.qty'></b> - cost basis <b
+              x-text='inr(openSum.cost)'></b> - FIFO cost <b x-text='inr(openSum.fifo)'></b></span>
+        </div>
+      </div>
+
+      <!-- table -->
+      <div id='table-wrap' class='tbl-wrap' x-data='dataTable'>
+        <table id='table' class='tbl'>
+          <thead>
+            <tr>
+              <template x-for='c in cols' :key='c.k'>
+                <th @click='sortBy(c.k)' :class='c.n ? "num" : ""'>
+                  <span x-text='c.label'></span>
+                  <span class='sort-mark' x-text='sortMark(c.k)'></span>
+                </th>
+              </template>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-for='r in shown' :key='r.key'>
+              <tr @click='openSymbol(r.symbol)' title='Click for chart'>
+                <template x-for='c in cols' :key='c.k'>
+                  <td :class='cellClass(r, c)' x-text='cell(r, c)'></td>
+                </template>
+              </tr>
+            </template>
+            <tr x-show='!rows.length' class='empty-row'>
+              <td :colspan='cols.length' class='empty'>
+                <div class='empty-icon'>&#8709;</div>
+                Nothing matches your filters.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div x-show='rows.length > shown.length' class='more'>
+        <button @click='showAll = true' class='btn'>Show all <span x-text='rows.length'></span> rows</button>
+      </div>
+
+      <p id='note' class='note'>
+        Imported <span x-text='stats.file'></span> on <span x-text='stats.importedAt'></span>. Realized P&amp;L uses
+        FIFO. Cost basis = weighted avg buy price x open qty; FIFO cost = cost of remaining lots.
+      </p>
+      </div>
+    </main>
+    </div>
+  </div>
+
+</body>
+
+</html>

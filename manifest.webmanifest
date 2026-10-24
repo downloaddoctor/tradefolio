@@ -1,0 +1,18 @@
+{
+  "name": "Tradefolio",
+  "short_name": "Tradefolio",
+  "description": "Private, offline-ready trade portfolio journal with FIFO P&L and daily charts.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#050507",
+  "theme_color": "#050507",
+  "icons": [
+    {
+      "src": "./assets/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
