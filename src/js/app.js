@@ -27,6 +27,17 @@ export function app() {
       this.pane = p;
       this.syncHash();
     },
+    tvUrl(sym) {
+      if (!sym) return '';
+      const s = String(sym).trim().toUpperCase();
+      const ticker = s.replace(/\.(NS|BO)$/, '');
+      const ex = s.endsWith('.BO') ? 'BSE' : 'NSE';
+      return 'https://www.tradingview.com/chart/?symbol=' + encodeURIComponent(ex + ':' + ticker);
+    },
+    openTradingView(sym) {
+      const url = this.tvUrl(sym || this.sel);
+      if (url) window.open(url, '_blank', 'noopener');
+    },
     hashSym: '', flagKeys: { closedOnly: 'c', hideBuys: 'b', hideSells: 's', hideLines: 'l', hideVolume: 'v' },
     parseHash() {
       const [path, qs] = location.hash.split('?');

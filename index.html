@@ -251,6 +251,10 @@
                 <span class='badge' x-show='cs.msg'
                   :class='badgeClass'
                   :title='cs.msg' x-text='badgeText'></span>
+                <button class='btn btn-sm' @click='openTradingView(sel)' title='Open this symbol on TradingView'>
+                  TradingView
+                  <svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' width='11' height='11'><path stroke-linecap='round' stroke-linejoin='round' d='M14 4h6v6M20 4l-9 9M10 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-4'/></svg>
+                </button>
               </div>
               <div class='pane-stats' x-show='selPos'>
                 <span x-show='curPrice'>Price <b x-text='priceText'></b></span>
