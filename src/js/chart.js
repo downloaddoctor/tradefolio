@@ -9,6 +9,21 @@ export function destroyChart() {
   if (chart) { chart.remove(); chart = null; }
 }
 
+function themeColors() {
+  const root = getComputedStyle(document.documentElement);
+  const v = (n, fb) => (root.getPropertyValue(n) || '').trim() || fb;
+  return { up: v('--pos', '#34d399'), down: v('--neg', '#f87171') };
+}
+
+function withAlpha(hex, a) {
+  const s = hex.replace('#', '');
+  const n = s.length === 3 ? s.split('').map((c) => c + c).join('') : s;
+  const r = parseInt(n.slice(0, 2), 16);
+  const g = parseInt(n.slice(2, 4), 16);
+  const b = parseInt(n.slice(4, 6), 16);
+  return 'rgba(' + r + ',' + g + ',' + b + ',' + a + ')';
+}
+
 function snap(candles, day) {
   let lo = 0, hi = candles.length - 1, ans = 0;
   while (lo <= hi) {
@@ -23,6 +38,7 @@ export function drawSymbolChart(el, trades, candles, pos, opt = {}) {
   if (!el || typeof LightweightCharts === 'undefined') return;
   const txt = '#cbd5e1';
   const grid = 'rgba(148,163,184,.12)';
+  const { up, down } = themeColors();
   const list = (opt.allTrades || trades).slice().sort((a, b) => a.ts - b.ts || a.idx - b.idx);
   const vis = new Set(trades.map((t) => t.key));
   const hid = (t) => !vis.has(t.key) || (t.type === 'BUY' ? opt.hideBuys : opt.hideSells);
@@ -41,14 +57,14 @@ export function drawSymbolChart(el, trades, candles, pos, opt = {}) {
     time,
     position: t.type === 'BUY' ? 'belowBar' : 'aboveBar',
     shape: t.type === 'BUY' ? 'arrowUp' : 'arrowDown',
-    color: t.type === 'BUY' ? '#16a34a' : '#dc2626',
+    color: t.type === 'BUY' ? up : down,
     text: (t.type === 'BUY' ? 'B ' : 'S ') + t.qty + ' @ ' + (Math.round(t.price * 100) / 100)
   });
 
   if (candles && candles.length) {
     const cs = chart.addCandlestickSeries({
-      upColor: '#16a34a', downColor: '#dc2626', borderVisible: false,
-      wickUpColor: '#16a34a', wickDownColor: '#dc2626'
+      upColor: up, downColor: down, borderVisible: false,
+      wickUpColor: up, wickDownColor: down
     });
     cs.setData(candles.map((c) => ({ time: c.time, open: c.open, high: c.high, low: c.low, close: c.close })));
     const vol = chart.addHistogramSeries({ priceScaleId: 'vol', priceFormat: { type: 'volume' } });
@@ -56,7 +72,7 @@ export function drawSymbolChart(el, trades, candles, pos, opt = {}) {
     vol.applyOptions({ visible: !opt.hideVolume });
     vol.setData(candles.map((c) => ({
       time: c.time, value: c.volume,
-      color: c.close >= c.open ? 'rgba(22,163,74,.3)' : 'rgba(220,38,38,.3)'
+      color: c.close >= c.open ? withAlpha(up, 0.3) : withAlpha(down, 0.3)
     })));
     const marks = list.filter((t) => !hid(t)).map((t) => mk(t, snap(candles, dayOf(t.ts))));
     marks.sort((a, b) => (a.time < b.time ? -1 : a.time > b.time ? 1 : 0));
