@@ -6,9 +6,9 @@
   <meta name='viewport' content='width=device-width, initial-scale=1'>
   <meta name='color-scheme' content='dark'>
   <meta name='theme-color' content='#050507'>
-  <meta name='description' content='Private, offline-ready trade journal. Import broker trade history, track open positions, FIFO realized P&L and daily charts. All data stays in your browser.'>
+  <meta name='description' content='Private, offline-ready trade portfolio tracker. Import broker trade history, track open positions, FIFO realized P&L and daily charts. All data stays in your browser.'>
   <meta property='og:title' content='Tradefolio'>
-  <meta property='og:description' content='Private, offline-ready trade journal with FIFO P&L and daily charts.'>
+  <meta property='og:description' content='Private, offline-ready trade portfolio tracker with FIFO P&L and daily charts.'>
   <meta property='og:type' content='website'>
   <link rel='manifest' href='./manifest.webmanifest'>
   <link rel='icon' href='./assets/favicon.svg' type='image/svg+xml'>
@@ -196,7 +196,7 @@
     <!-- main views -->
     <main id='main' x-show='!preview && trades.length' class='fade-in'>
 
-      <div class='journal' x-show='showChart'>
+      <div class='tradefolio' x-show='showChart'>
         <div class='side-col' x-data='positionsSide'>
         <aside class='side'>
           <div class='side-head'>
@@ -331,9 +331,8 @@
             <span x-text='invalidSummary()'></span>
           </li>
           <li x-show='stats.dupRows'>
-            <span x-text='stats.dupRows'></span> rows repeat an earlier Exchange Order Id (partial fills can
-            legitimately share an id).
-            <label><input type='checkbox' x-model='dedupe'> Remove duplicates</label>
+            <span x-text='stats.dupRows'></span> duplicate rows removed (Exchange Order Id already seen in this
+            file or in an earlier import for this user).
           </li>
           <li x-show='shortN'>
             <span x-text='shortN'></span> symbol(s) have more sells than buys (SHORT) - check for missing earlier

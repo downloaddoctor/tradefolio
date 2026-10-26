@@ -76,7 +76,7 @@ b { font-weight: 600; }
 #app { position: relative; z-index: 1; max-width: 92rem; margin: 0 auto; padding: 0 0 6.5rem; display: flex; flex-direction: column; min-height: 100vh; }
 .shell { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 #main { flex: 1; display: flex; flex-direction: column; gap: 1.25rem; padding: .75rem .75rem 5.5rem; }
-#main > div[x-show]:not(.journal) { display: flex; flex-direction: column; gap: 1.5rem; }
+#main > div[x-show]:not(.tradefolio) { display: flex; flex-direction: column; gap: 1.5rem; }
 @media (min-width: 640px) { #main { padding: 1.5rem; } }
 .shell > .alert, .shell > #preview { margin: .75rem; }
 @media (min-width: 640px) { .shell > .alert, .shell > #preview { margin: 1.5rem; } }
@@ -244,9 +244,9 @@ b { font-weight: 600; }
 /* footer */
 #ftr { padding: .5rem 0 1.5rem; text-align: center; font-size: .75rem; color: var(--ink-muted); }
 
-/* journal: sidebar + chart pane */
-.journal { display: grid; grid-template-columns: 1fr; gap: 1rem; align-items: start; }
-@media (min-width: 1024px) { .journal { grid-template-columns: 17rem 1fr; } }
+/* tradefolio: sidebar + chart pane */
+.tradefolio { display: grid; grid-template-columns: 1fr; gap: 1rem; align-items: start; }
+@media (min-width: 1024px) { .tradefolio { grid-template-columns: 17rem 1fr; } }
 .side-col { display: flex; flex-direction: column; gap: 1rem; align-self: start; min-width: 0; }
 .side { border: 1px solid var(--line-strong); border-radius: 12px; background: var(--panel); overflow: hidden; align-self: start; width: 100%; max-height: calc(100vh - 6.5rem); display: flex; flex-direction: column; }
 .side:not(.side-dash) { max-height: 24rem; }
@@ -349,7 +349,7 @@ body { font-size: 13px; line-height: 1.4; }
 #main { gap: .5rem; padding: .4rem .4rem 4rem; }
 @media (min-width: 640px) { #main { padding: .5rem .5rem 4rem; } }
 @media (min-width: 640px) { .tab { padding: .18rem .6rem; } }
-#main > div[x-show]:not(.journal) { gap: .5rem; }
+#main > div[x-show]:not(.tradefolio) { gap: .5rem; }
 .shell > .alert, .shell > #preview { margin: .4rem; }
 #hdr { bottom: .5rem; padding: .2rem .3rem; border-radius: 6px; gap: .35rem; }
 .hdr-tabs { border-radius: 5px; padding: .12rem; }
@@ -395,8 +395,8 @@ body { font-size: 13px; line-height: 1.4; }
 .tbl thead th { padding: .25rem .5rem; font-size: .62rem; }
 .tbl td, .cell { padding: .15rem .5rem; }
 .empty { padding: 1.5rem .5rem; }
-.journal { gap: .5rem; }
-@media (min-width: 1024px) { .journal { grid-template-columns: 15rem 1fr; } }
+.tradefolio { gap: .5rem; }
+@media (min-width: 1024px) { .tradefolio { grid-template-columns: 15rem 1fr; } }
 .side-col { gap: .5rem; }
 .side { border-radius: 4px; }
 .side-head { padding: .3rem .5rem; font-size: .72rem; }

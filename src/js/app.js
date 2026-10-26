@@ -326,10 +326,11 @@ export function app() {
     async confirmImport() {
       this.userModal = false;
       if (!this.preview) return;
-      const { trades, stats } = buildTrades(this.preview);
       const hash = this.preview.hash;
       const user = this.uname.trim();
       if (!user) { this.error = 'Enter a username for this import.'; return; }
+      const known = new Set(this.trades.filter((t) => (t.user || '') === user && t.orderId).map((t) => t.orderId));
+      const { trades, stats } = buildTrades(this.preview, known);
       const prev = await findImport(hash, user);
       if (prev) { this.error = 'Already imported for ' + user + ' as ' + prev.id + ' (' + prev.file + ', ' + prev.importedAt + ').'; return; }
       this.preview = null;

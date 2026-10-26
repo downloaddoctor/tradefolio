@@ -1,4 +1,5 @@
 import { loadCandles, saveCandles } from './db.js';
+import { yahooCandidates } from './symbols.js';
 
 const HOST = 'https://query1.finance.yahoo.com';
 const CORS_KEY = 'corsKey';
@@ -13,14 +14,6 @@ export function saveCorsKey(k) {
 }
 
 const sameDay = (ts) => new Date(ts).toDateString() === new Date().toDateString();
-
-export function yahooCandidates(symbol) {
-  const s = String(symbol || '').trim().toUpperCase();
-  if (!s) return [];
-  if (s.includes('.')) return [s];
-  if (/^\d+$/.test(s)) return [s + '.BO'];
-  return [s + '.NS', s + '.BO'];
-}
 
 // the only data route: Yahoo chart API through corsproxy.io (optional key from localStorage)
 function proxyUrl(u) {

@@ -1,24 +1,7 @@
 import { emptyStats } from './parse.js';
 
-const db = new Dexie('tradeJournal');
+const db = new Dexie('tradefolio');
 db.version(1).stores({
-  trades: 'key,symbol,ts',
-  meta: 'id'
-});
-db.version(2).stores({
-  trades: 'key,symbol,ts',
-  meta: 'id',
-  candles: 'sym'
-});
-
-db.version(3).stores({
-  trades: 'key,symbol,ts',
-  meta: 'id',
-  candles: 'sym',
-  imports: 'id,hash'
-});
-
-db.version(4).stores({
   trades: 'key,symbol,ts',
   meta: 'id',
   candles: 'sym',

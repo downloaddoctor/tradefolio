@@ -34,12 +34,61 @@ function showFatal(msg) {
   document.body.appendChild(el);
 }
 
-const s = document.createElement('script');
-s.src = 'https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js';
-s.defer = true;
-s.onerror = () => showFatal('A required library failed to load. Check your connection and retry.');
-s.onload = () => {
-  const miss = missingLibs();
-  if (miss.length) showFatal('Failed to load: ' + miss.join(', ') + '. Check your connection and retry.');
-};
-document.head.appendChild(s);
+function loadAlpine() {
+  const s = document.createElement('script');
+  s.src = 'https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js';
+  s.defer = true;
+  s.onerror = () => showFatal('A required library failed to load. Check your connection and retry.');
+  s.onload = () => {
+    const miss = missingLibs();
+    if (miss.length) showFatal('Failed to load: ' + miss.join(', ') + '. Check your connection and retry.');
+  };
+  document.head.appendChild(s);
+}
+
+const params = new URLSearchParams(location.search);
+
+function dropDb(name, onBlocked) {
+  return new Promise((resolve) => {
+    if (!('indexedDB' in window)) return resolve();
+    const r = indexedDB.deleteDatabase(name);
+    r.onsuccess = r.onerror = () => resolve();
+    r.onblocked = () => { if (onBlocked) onBlocked(); };
+  });
+}
+
+function showNotice(msg) {
+  const el = document.createElement('div');
+  el.setAttribute('role', 'status');
+  el.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;padding:.6rem 1rem;background:#8b5cf6;color:#fff;font:13px system-ui,sans-serif;text-align:center';
+  el.textContent = msg;
+  document.body.appendChild(el);
+  return el;
+}
+
+function dropCaches() {
+  if (!('caches' in window)) return Promise.resolve();
+  return caches.keys().then((ks) => Promise.all(ks.map((k) => caches.delete(k))));
+}
+
+dropDb('tradeJournal');
+
+if (params.get('new') === '1') {
+  let note = null;
+  Promise.all([
+    dropDb('tradefolio', () => {
+      if (!note) note = showNotice('Close other Tradefolio tabs to finish resetting data...');
+    }),
+    dropCaches()
+  ])
+    .catch((e) => console.warn('reset failed', e))
+    .then(() => {
+      if (note) note.remove();
+      params.delete('new');
+      const q = params.toString();
+      history.replaceState(null, '', location.pathname + (q ? '?' + q : '') + location.hash);
+      loadAlpine();
+    });
+} else {
+  loadAlpine();
+}

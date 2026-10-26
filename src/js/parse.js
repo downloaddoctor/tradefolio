@@ -31,7 +31,7 @@ export function parseDate(v) {
   }
   const s = String(v == null ? '' : v).trim();
   if (!s) return NaN;
-  let m = s.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})(?:[ T,]+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*([AaPp])\.?[Mm]?\.?)?\s*$/);
+  let m = s.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})(?:[ T,]+(\d{1,2}):(\d{2})(?::(\d{2}))?(?:\s*([AaPp])\.?[Mm]?\.?)?)?\s*$/);
   if (m) {
     let h = m[4] ? parseInt(m[4], 10) : 0;
     if (m[7]) {
@@ -104,13 +104,13 @@ export function parseWorkbook(buf, fileName) {
   throw new Error('Could not find a header row (expected columns like Stock name, Symbol, Type, Quantity...).');
 }
 
-export function buildTrades(pv) {
+export function buildTrades(pv, known) {
   const cm = pv.colMap;
   const stats = emptyStats();
   stats.file = pv.fileName;
   stats.importedAt = new Date().toLocaleString('en-IN');
   const trades = [];
-  const seen = new Set();
+  const seen = new Set(known || []);
   const get = (row, k) => { const i = cm[k]; return i == null || i < 0 ? '' : row[i]; };
   pv.dataRows.forEach((row, i) => {
     const rowNo = pv.headerRow + 1 + i;
@@ -145,8 +145,8 @@ export function buildTrades(pv) {
       orderId, ts, dup: false
     };
     if (orderId) {
-      if (seen.has(orderId)) { t.dup = true; stats.dupRows++; }
-      else seen.add(orderId);
+      if (seen.has(orderId)) { stats.dupRows++; return; }
+      seen.add(orderId);
     }
     trades.push(t);
   });

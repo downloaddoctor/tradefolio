@@ -1,6 +1,6 @@
 # Tradefolio
 
-Private, offline-ready trade journal. Import your broker trade history (xlsx, xls, csv) and get open positions, FIFO realized P&L and daily charts. No backend, and no data leaves your browser.
+Private, offline-ready trade portfolio tracker. Import your broker trade history (xlsx, xls, csv) and get open positions, FIFO realized P&L and daily charts. No backend, and no data leaves your browser.
 
 ## Features
 
@@ -29,19 +29,21 @@ This writes a minified bundle to `dist/`. The included GitHub Actions workflow (
 ## Import format
 
 - Supported files: `.xlsx`, `.xls`, `.csv`. Use the sample download on the empty screen for a template.
+- Groww order history reports are supported as downloaded, with no editing needed. Other brokers work if their columns match the table below.
 - Headers are matched by name, case-insensitive. The header row is auto-detected (at least 4 known headers).
 
-| Column | Required |
-| --- | --- |
-| Symbol, ISIN or Stock name | at least one |
-| Type (BUY / SELL) | yes |
-| Quantity | yes |
-| Value (total trade value) | yes |
-| Execution date and time | yes |
-| Order status | yes |
-| Exchange, Exchange Order Id | no |
+| Column                      | Required     |
+| --------------------------- | ------------ |
+| Symbol, ISIN or Stock name  | at least one |
+| Type (BUY / SELL)           | yes          |
+| Quantity                    | yes          |
+| Value (total trade value)   | yes          |
+| Execution date and time     | yes          |
+| Order status                | yes          |
+| Exchange, Exchange Order Id | no           |
 
 - Only rows with status `Executed` are used.
+- Duplicates: rows whose `Exchange Order Id` repeats within the same file, or was already imported for the same username, are dropped at import and counted in the warnings panel. This makes overlapping reports safe to import. The same file cannot be imported twice for one username. Rows without an order id cannot be de-duplicated.
 - Dates: `DD-MM-YYYY HH:MM`, with optional AM/PM, ISO `YYYY-MM-DD`, or Excel serial dates. No timezone conversion is applied.
 
 ## How P&L is calculated
@@ -61,12 +63,13 @@ Trades, imports and cached candles stay in your browser (IndexedDB). Outbound re
 
 ## Troubleshooting
 
-| Symptom | Fix |
-| --- | --- |
-| Blank page | Hard reload. The CDN guard names the library that failed. |
-| Chart says `no data` | Set the corsproxy.io key, then click Reload. |
-| Old UI after an update | Bump `CACHE` in `sw.js`, or open `?dev=1` once. |
-| Import rejected | The same file was already imported for that username. |
+| Symptom                | Fix                                                       |
+| ---------------------- | --------------------------------------------------------- |
+| Blank page             | Hard reload. The CDN guard names the library that failed. |
+| Chart says `no data`   | Set the corsproxy.io key, then click Reload.              |
+| Old UI after an update | Bump `CACHE` in `sw.js`, or open `?dev=1` once.           |
+| Reset all local data   | Open `?new=1` once. It drops the IndexedDB and caches.    |
+| Import rejected        | The same file was already imported for that username.     |
 
 ## Known limitations
 
