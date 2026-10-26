@@ -8,10 +8,10 @@ Private, offline-ready trade portfolio tracker. Import your broker trade history
 - Open positions, all trades (search and filters) and closed / summary tabs, all sortable
 - Per-stock daily candles with buy and sell markers, a 'Current avg' line and unrealized P&L
 - Average-down recovery table for open positions
-- Multiple users: each import is saved under a username
-- Duplicate protection: repeated Exchange Order Ids and re-imported files are dropped
+- Multiple users: each import is saved under a username; the selected user is kept in the page URL (`u=` in the hash), so a link reopens the same user's view
+- Duplicate handling: a repeated Exchange Order Id replaces the older trade; re-imported files are rejected
 - Warnings panel for skipped rows and SHORT anomalies
-- CSV / XLSX export of the current view
+- CSV / XLSX export of the current view (the trades view includes the username)
 - Works offline after the first visit (PWA)
 - INR formatting, dark theme, responsive layout
 
@@ -31,12 +31,15 @@ Private, offline-ready trade portfolio tracker. Import your broker trade history
 | Execution date and time     | yes          |
 | Order status                | yes          |
 | Exchange, Exchange Order Id | no           |
+| Username                    | no           |
+
+A `Username` column assigns each row to a user. Rows without one use the username entered at import. Exporting the Trades view writes exactly these columns (dates with seconds), so the file can be imported back with its users attached.
 
 Dates: `DD-MM-YYYY HH:MM` with optional AM/PM, ISO `YYYY-MM-DD`, or Excel serial dates. No timezone conversion is applied.
 
 ## Duplicates
 
-Rows whose `Exchange Order Id` repeats within the file, or was already imported for the same username, are dropped and counted in the warnings panel. Overlapping reports are therefore safe to import. The same file cannot be imported twice for one username. Rows without an order id cannot be de-duplicated.
+A trade is unique by `Exchange Order Id`, across all usernames. If a row repeats an order id within the file, or that order id already exists from an earlier import (under any username), the newer row replaces the older one and is counted in the warnings panel. Overlapping reports are therefore safe to import. The same file cannot be imported twice for one username. Rows without an order id cannot be de-duplicated.
 
 ## How P&L is calculated
 
@@ -55,9 +58,9 @@ Trades, imports and cached candles stay in your browser (IndexedDB). Outbound re
 
 ## URL options
 
-| Parameter | Effect                                                 |
-| --------- | ------------------------------------------------------ |
-| `?new=1`  | Deletes all local data (IndexedDB) and caches, then loads fresh |
+| Parameter | Effect                                                            |
+| --------- | ----------------------------------------------------------------- |
+| `?new=1`  | Deletes all local data (IndexedDB) and caches, then loads fresh   |
 | `?dev=1`  | Unregisters the service worker and clears caches, for development |
 
 ## Known limitations

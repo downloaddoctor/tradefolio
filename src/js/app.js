@@ -17,7 +17,7 @@ export function app() {
     drag: false, error: '', preview: null,
     trades: [], positions: [], stats: emptyStats(),
     totals: { openCount: 0, invested: 0, realized: 0, shortCount: 0 },
-    dedupe: false, view: 'open', showAll: false, user: '', uname: '', hideShort: false, shortN: 0, shortSet: {}, shortList: [], fixPrice: {},
+    view: 'open', showAll: false, user: '', uname: '', hideShort: false, shortN: 0, shortSet: {}, shortList: [], fixPrice: {},
     q: '', fType: '', fSym: '', dFrom: '', dTo: '',
     sorts: { open: { k: 'costBasis', d: -1 }, trades: { k: 'ts', d: -1 }, summary: { k: 'realized', d: -1 } },
     pane: 'data', keyOpen: false, userOpen: false, userModal: false,
@@ -50,9 +50,13 @@ export function app() {
       this.posSort = ['unr', 'pnl', 'pct', 'realized', 'value', 'symbol'].includes(so) ? so : 'default';
       const x = new URLSearchParams(qs || '').get('x') || '';
       Object.keys(this.flagKeys).forEach((k) => { this[k] = x.includes(this.flagKeys[k]); });
+      const u = new URLSearchParams(qs || '').get('u') || '';
+      this.user = this.trades.length && u && !this.users.includes(u) ? '' : u;
     },
-    hashQuery() {
+    hashQuery(data) {
       const q = [];
+      if (this.user) q.push('u=' + encodeURIComponent(this.user));
+      if (data) return q.length ? '?' + q.join('&') : '';
       if (this.posFilter !== 'all') q.push('f=' + this.posFilter);
       if (this.posSort !== 'default') q.push('s=' + this.posSort);
       const x = Object.keys(this.flagKeys).filter((k) => this[k]).map((k) => this.flagKeys[k]).join('');
@@ -60,7 +64,7 @@ export function app() {
       return q.length ? '?' + q.join('&') : '';
     },
     syncHash() {
-      const h = this.pane === 'chart' ? '#chart' + (this.sel ? '/' + encodeURIComponent(this.sel) : '') + this.hashQuery() : '#' + this.pane;
+      const h = this.pane === 'chart' ? '#chart' + (this.sel ? '/' + encodeURIComponent(this.sel) : '') + this.hashQuery() : '#' + this.pane + this.hashQuery(true);
       if (location.hash !== h) history.replaceState(null, '', h);
     },
     async init() {
@@ -70,9 +74,8 @@ export function app() {
         if (this.sel) this.paint();
         if (this.hashSym && this.hashSym !== this.sel && this.positions.some((p) => p.symbol === this.hashSym)) this.openSymbol(this.hashSym);
       });
-      this.$watch('dedupe', () => this.recompute());
       this.$watch('hideShort', () => { this.recompute(); this.showAll = false; });
-      this.$watch('user', () => { this.recompute(); this.fSym = ''; this.showAll = false; });
+      this.$watch('user', () => { this.recompute(); this.fSym = ''; this.showAll = false; this.syncHash(); });
       this.$watch('view', () => { this.showAll = false; });
       this.$watch('posSort', () => this.syncHash());
       this.$watch('posFilter', () => this.syncHash());
@@ -82,7 +85,9 @@ export function app() {
         if (d) {
           this.trades = d.trades;
           this.stats = d.stats;
+          if (this.user && !this.users.includes(this.user)) this.user = '';
           this.recompute();
+          this.syncHash();
         }
       } catch (e) {
         this.error = 'Could not load saved data: ' + e.message;
@@ -329,8 +334,11 @@ export function app() {
       const hash = this.preview.hash;
       const user = this.uname.trim();
       if (!user) { this.error = 'Enter a username for this import.'; return; }
-      const known = new Set(this.trades.filter((t) => (t.user || '') === user && t.orderId).map((t) => t.orderId));
-      const { trades, stats } = buildTrades(this.preview, known);
+      const { trades, stats } = buildTrades(this.preview);
+      const ids = new Set(trades.map((t) => t.orderId).filter(Boolean));
+      const old = this.trades.filter((t) => t.orderId && ids.has(t.orderId));
+      const oldKeys = old.map((t) => t.key);
+      stats.dupRows += old.length;
       const prev = await findImport(hash, user);
       if (prev) { this.error = 'Already imported for ' + user + ' as ' + prev.id + ' (' + prev.file + ', ' + prev.importedAt + ').'; return; }
       this.preview = null;
@@ -338,14 +346,15 @@ export function app() {
       try {
         const id = await newImportId();
         const base = this.trades.reduce((m, t) => Math.max(m, t.idx + 1), 0);
-        const added = trades.map((t) => ({ ...t, key: id + ':' + t.key, idx: base + t.idx, imp: id, user }));
+        const added = trades.map((t) => ({ ...t, key: id + ':' + t.key, idx: base + t.idx, imp: id, user: t.user || user }));
         stats.file = stats.file + ' [' + id + ']';
-        await saveImport(id, hash, user, added, stats);
-        this.user = user;
-        this.trades = this.trades.concat(added);
+        await saveImport(id, hash, user, added, stats, oldKeys);
+        const us = new Set(added.map((t) => t.user));
+        this.user = us.size === 1 ? added[0].user : '';
+        const gone = new Set(oldKeys);
+        this.trades = this.trades.filter((t) => !gone.has(t.key)).concat(added);
         this.stats = stats;
         this.error = '';
-        this.dedupe = false;
         this.recompute();
       } catch (e) { this.error = 'Could not save to IndexedDB: ' + e.message; }
     },
@@ -355,7 +364,7 @@ export function app() {
       const px = Number(this.fixPrice[s.symbol]) > 0 ? Number(this.fixPrice[s.symbol]) : s.guess;
       const first = this.baseTrades().filter((t) => t.sym === s.symbol).sort((a, b) => a.ts - b.ts || a.idx - b.idx)[0];
       const base = this.trades.reduce((m, t) => Math.max(m, t.idx + 1), 0);
-      return { ...first, key: 'fix:' + s.symbol + ':' + Date.now(), idx: base, row: 0, type: 'BUY', qty: s.missing, price: px, value: s.missing * px, orderId: '', ts: first.ts - 86400000, dup: false, imp: 'fix', user: first.user };
+      return { ...first, key: 'fix:' + s.symbol + ':' + Date.now(), idx: base, row: 0, type: 'BUY', qty: s.missing, price: px, value: s.missing * px, orderId: '', ts: first.ts - 86400000, imp: 'fix', user: first.user };
     },
     async fixApply(list) {
       if (!list.length) return;
@@ -370,7 +379,7 @@ export function app() {
     fixAllShorts() { return this.fixApply(this.shortList.slice()); },
     baseTrades() {
       const list = this.user ? this.trades.filter((t) => (this.user === '(unassigned)' ? !t.user : t.user === this.user)) : this.trades;
-      return this.dedupe ? list.filter((t) => !t.dup) : list;
+      return list;
     },
     activeTrades() {
       const list = this.baseTrades();
@@ -485,7 +494,7 @@ export function app() {
       if (held) out.push({ tone: '', text: 'Longest held: ' + held.symbol + ' for ' + Math.floor((Date.now() - held.firstBuy) / 864e5) + ' days.' });
       return out;
     },
-    get overview() { const t = this.activeTrades(), P = this.positions, S = (a, f) => a.reduce((s, x) => s + f(x), 0), B = t.filter((x) => x.type === 'BUY'), L = t.filter((x) => x.type === 'SELL'), W = P.filter((p) => p.realized > 0), X = P.filter((p) => p.realized < 0), O = P.filter((p) => p.status === 'OPEN'), SH = P.filter((p) => p.status === 'SHORT'), C = P.filter((p) => p.status === 'CLOSED'), R = P.slice().sort((a, b) => b.realized - a.realized), ts = t.map((x) => x.ts), days = new Set(t.map((x) => new Date(x.ts).toDateString())).size, top = P.slice().sort((a, b) => b.n - a.n)[0], big = O.slice().sort((a, b) => b.costBasis - a.costBasis)[0], dec = W.length + X.length, gp = S(W, (p) => p.realized), gl = -S(X, (p) => p.realized), bv = S(B, (x) => x.value), sv = S(L, (x) => x.value), ex = {}; t.forEach((x) => { const k = x.exchange || '-'; ex[k] = (ex[k] || 0) + 1; }); const pl = (v) => (v > 0 ? '+' : '') + this.inr(v); const tone = (v) => (v > 0 ? 'g' : v < 0 ? 'r' : ''); const best = R[0] && R[0].realized > 0 ? R[0] : null; const worst = R.length && R[R.length - 1].realized < 0 ? R[R.length - 1] : null; return [['Total trades', t.length, ''], ['Buys / Sells', B.length + ' / ' + L.length, ''], ['Buy value', this.inr(bv), ''], ['Sell value', this.inr(sv), ''], ['Turnover', this.inr(bv + sv), ''], ['Avg trade value', t.length ? this.inr((bv + sv) / t.length) : '-', ''], ['Symbols traded', P.length, ''], ['Open / Closed / Short', O.length + ' / ' + C.length + ' / ' + SH.length, ''], ['Invested (open cost)', this.inr(this.totals.invested), ''], ['Realized P&L (FIFO)', pl(this.totals.realized), tone(this.totals.realized)], ['Winners / Losers', W.length + ' / ' + X.length, ''], ['Win rate', dec ? (W.length / dec * 100).toFixed(1) + '%' : '-', ''], ['Avg win', W.length ? pl(gp / W.length) : '-', W.length ? 'g' : ''], ['Avg loss', X.length ? pl(-gl / X.length) : '-', X.length ? 'r' : ''], ['Profit factor', gl ? (gp / gl).toFixed(2) : '-', ''], ['Best symbol', best ? best.symbol + ' ' + pl(best.realized) : '-', best ? 'g' : ''], ['Worst symbol', worst ? worst.symbol + ' ' + pl(worst.realized) : '-', worst ? 'r' : ''], ['Largest open position', big ? big.symbol + ' ' + this.inr(big.costBasis) : '-', ''], ['Most traded', top ? top.symbol + ' (' + top.n + ')' : '-', ''], ['Date range', ts.length ? fmtDate(Math.min(...ts)) + ' to ' + fmtDate(Math.max(...ts)) : '-', ''], ['Trading days', days, ''], ['Trades per day', days ? (t.length / days).toFixed(1) : '-', ''], ['Exchanges', Object.keys(ex).map((k) => k + ' ' + ex[k]).join(', ') || '-', ''], ['Imports / Users', new Set(t.map((x) => x.imp)).size + ' / ' + new Set(t.map((x) => x.user || '(unassigned)')).size, ''], ['Duplicate rows', t.filter((x) => x.dup).length, '']]; },
+    get overview() { const t = this.activeTrades(), P = this.positions, S = (a, f) => a.reduce((s, x) => s + f(x), 0), B = t.filter((x) => x.type === 'BUY'), L = t.filter((x) => x.type === 'SELL'), W = P.filter((p) => p.realized > 0), X = P.filter((p) => p.realized < 0), O = P.filter((p) => p.status === 'OPEN'), SH = P.filter((p) => p.status === 'SHORT'), C = P.filter((p) => p.status === 'CLOSED'), R = P.slice().sort((a, b) => b.realized - a.realized), ts = t.map((x) => x.ts), days = new Set(t.map((x) => new Date(x.ts).toDateString())).size, top = P.slice().sort((a, b) => b.n - a.n)[0], big = O.slice().sort((a, b) => b.costBasis - a.costBasis)[0], dec = W.length + X.length, gp = S(W, (p) => p.realized), gl = -S(X, (p) => p.realized), bv = S(B, (x) => x.value), sv = S(L, (x) => x.value), ex = {}; t.forEach((x) => { const k = x.exchange || '-'; ex[k] = (ex[k] || 0) + 1; }); const pl = (v) => (v > 0 ? '+' : '') + this.inr(v); const tone = (v) => (v > 0 ? 'g' : v < 0 ? 'r' : ''); const best = R[0] && R[0].realized > 0 ? R[0] : null; const worst = R.length && R[R.length - 1].realized < 0 ? R[R.length - 1] : null; return [['Total trades', t.length, ''], ['Buys / Sells', B.length + ' / ' + L.length, ''], ['Buy value', this.inr(bv), ''], ['Sell value', this.inr(sv), ''], ['Turnover', this.inr(bv + sv), ''], ['Avg trade value', t.length ? this.inr((bv + sv) / t.length) : '-', ''], ['Symbols traded', P.length, ''], ['Open / Closed / Short', O.length + ' / ' + C.length + ' / ' + SH.length, ''], ['Invested (open cost)', this.inr(this.totals.invested), ''], ['Realized P&L (FIFO)', pl(this.totals.realized), tone(this.totals.realized)], ['Winners / Losers', W.length + ' / ' + X.length, ''], ['Win rate', dec ? (W.length / dec * 100).toFixed(1) + '%' : '-', ''], ['Avg win', W.length ? pl(gp / W.length) : '-', W.length ? 'g' : ''], ['Avg loss', X.length ? pl(-gl / X.length) : '-', X.length ? 'r' : ''], ['Profit factor', gl ? (gp / gl).toFixed(2) : '-', ''], ['Best symbol', best ? best.symbol + ' ' + pl(best.realized) : '-', best ? 'g' : ''], ['Worst symbol', worst ? worst.symbol + ' ' + pl(worst.realized) : '-', worst ? 'r' : ''], ['Largest open position', big ? big.symbol + ' ' + this.inr(big.costBasis) : '-', ''], ['Most traded', top ? top.symbol + ' (' + top.n + ')' : '-', ''], ['Date range', ts.length ? fmtDate(Math.min(...ts)) + ' to ' + fmtDate(Math.max(...ts)) : '-', ''], ['Trading days', days, ''], ['Trades per day', days ? (t.length / days).toFixed(1) : '-', ''], ['Exchanges', Object.keys(ex).map((k) => k + ' ' + ex[k]).join(', ') || '-', ''], ['Imports / Users', new Set(t.map((x) => x.imp)).size + ' / ' + new Set(t.map((x) => x.user || '(unassigned)')).size, '']]; },
     get shown() { return this.showAll ? this.rows : this.rows.slice(0, 1000); }, get openSum() { const r = this.view === 'open' ? this.rows : []; return { n: r.length, qty: r.reduce((a, p) => a + p.net, 0), cost: r.reduce((a, p) => a + p.costBasis, 0), fifo: r.reduce((a, p) => a + p.fifoCost, 0) }; },
 
     sortBy(k) {
@@ -497,14 +506,23 @@ export function app() {
       return s.k === k ? (s.d === 1 ? '\u25B2' : '\u25BC') : '';
     },
 
+    importRow(r) {
+      const d = new Date(r.ts);
+      const p = (n) => String(n).padStart(2, '0');
+      return {
+        'Stock name': r.stock || '', 'Symbol': r.symbol || '', 'ISIN': r.isin || '', 'Type': r.type,
+        'Quantity': r.qty, 'Value': r.value, 'Exchange': r.exchange || '', 'Exchange Order Id': r.orderId || '',
+        'Execution date and time': p(d.getUTCDate()) + '-' + p(d.getUTCMonth() + 1) + '-' + d.getUTCFullYear() + ' ' + p(d.getUTCHours()) + ':' + p(d.getUTCMinutes()) + ':' + p(d.getUTCSeconds()),
+        'Order status': 'Executed', 'Username': r.user || ''
+      };
+    },
     exportView(fmt) {
       const cols = this.cols;
-      const data = this.rows.map((r) => {
+      const data = this.view === 'trades' ? this.rows.slice().sort((a, b) => a.ts - b.ts || a.idx - b.idx).map((r) => this.importRow(r)) : this.rows.map((r) => {
         const o = {};
         cols.forEach((c) => {
           let v = r[c.k];
           if (c.f === 'date') v = fmtDate(v);
-          else if (c.f === 'flag') v = v ? 'DUP' : '';
           o[c.label] = v == null ? '' : v;
         });
         return o;

@@ -21,8 +21,9 @@ export async function newImportId() {
   }
 }
 
-export async function saveImport(id, hash, user, trades, stats) {
+export async function saveImport(id, hash, user, trades, stats, removeKeys) {
   await db.transaction('rw', db.trades, db.meta, db.imports, async () => {
+    if (removeKeys && removeKeys.length) await db.trades.bulkDelete(removeKeys);
     await db.trades.bulkPut(plain(trades));
     await db.imports.put({ id, hash, user, file: stats.file, importedAt: stats.importedAt, count: trades.length });
     await db.meta.put({ id: 'stats', value: plain(stats) });

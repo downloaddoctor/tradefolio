@@ -25,7 +25,7 @@ test('normSymbol drops .0 suffix on numeric symbols', () => {
   assert.equal(normSymbol('INFY'), 'INFY');
 });
 
-test('buildTrades keeps executed rows, removes repeated orderId', () => {
+test('buildTrades keeps executed rows, replaces repeated orderId with the later row', () => {
   const pv = {
     fileName: 'x.xlsx', sheet: 'T', headerRow: 1,
     colMap: { stock: 0, symbol: 1, isin: -1, type: 2, qty: 3, value: 4, exchange: -1, orderId: 5, date: 6, status: 7 },
@@ -37,10 +37,8 @@ test('buildTrades keeps executed rows, removes repeated orderId', () => {
   };
   const { trades, stats } = buildTrades(pv);
   assert.equal(trades.length, 1);
+  assert.equal(trades[0].type, 'SELL');
   assert.equal(stats.dupRows, 1);
-  const again = buildTrades(pv, new Set(['A1']));
-  assert.equal(again.trades.length, 0);
-  assert.equal(again.stats.dupRows, 2);
   assert.equal(stats.skippedStatusTotal, 1);
 });
 
@@ -65,6 +63,24 @@ test('yahooCandidates picks .NS then .BO, numeric to .BO', () => {
   assert.deepEqual(yahooCandidates('500285'), ['500285.BO']);
   assert.deepEqual(yahooCandidates('TCS.NS'), ['TCS.NS']);
   assert.deepEqual(yahooCandidates(''), []);
+});
+
+test('buildTrades reads optional Username column', () => {
+  const pv = {
+    fileName: 'x.xlsx', sheet: 'T', headerRow: 1,
+    colMap: { stock: 0, symbol: 1, isin: -1, type: 2, qty: 3, value: 4, exchange: -1, orderId: 5, date: 6, status: 7, user: 8 },
+    dataRows: [['INFY', 'INFY', 'BUY', 10, 15000, 'A1', '05-01-2024 09:20', 'Executed', 'alice']]
+  };
+  const { trades } = buildTrades(pv);
+  assert.equal(trades[0].user, 'alice');
+});
+
+test('export row date format re-parses to the same timestamp', () => {
+  const ts = Date.UTC(2024, 0, 5, 9, 20, 37);
+  const d = new Date(ts);
+  const p = (n) => String(n).padStart(2, '0');
+  const s = p(d.getUTCDate()) + '-' + p(d.getUTCMonth() + 1) + '-' + d.getUTCFullYear() + ' ' + p(d.getUTCHours()) + ':' + p(d.getUTCMinutes()) + ':' + p(d.getUTCSeconds());
+  assert.equal(parseDate(s), ts);
 });
 
 test('emptyStats shape', () => {

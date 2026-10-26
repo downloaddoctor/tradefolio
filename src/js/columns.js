@@ -15,6 +15,7 @@ export const COLS = {
   trades: [
     { k: 'row', label: 'Row', f: 'int', n: 1 },
     { k: 'ts', label: 'Executed', f: 'date' },
+    { k: 'user', label: 'User', f: 'text' },
     { k: 'symbol', label: 'Symbol', f: 'text' },
     { k: 'stock', label: 'Stock name', f: 'text' },
     { k: 'isin', label: 'ISIN', f: 'text' },
@@ -23,8 +24,7 @@ export const COLS = {
     { k: 'price', label: 'Price', f: 'inr', n: 1 },
     { k: 'value', label: 'Value', f: 'inr', n: 1 },
     { k: 'exchange', label: 'Exchange', f: 'text' },
-    { k: 'orderId', label: 'Exchange Order Id', f: 'text' },
-    { k: 'dup', label: 'Dup', f: 'flag' }
+    { k: 'orderId', label: 'Exchange Order Id', f: 'text' }
   ],
   summary: [
     { k: 'symbol', label: 'Symbol', f: 'text' },
@@ -49,7 +49,6 @@ export function cell(r, c) {
     case 'int': return v == null ? '-' : String(v);
     case 'date': return fmtDate(v);
     case 'oq': return r.status === 'SHORT' ? 'SHORT ' + NUM.format(v) : NUM.format(v);
-    case 'flag': return v ? 'DUP' : '';
     default: return v == null || v === '' ? '-' : String(v);
   }
 }
@@ -61,7 +60,6 @@ export function cellClass(r, c) {
   if (c.f === 'pnl') cls += v >= 0 ? ' pos' : ' neg';
   if (c.f === 'type') cls += v === 'BUY' ? ' pos medium' : ' neg medium';
   if (c.f === 'oq' && r.status === 'SHORT') cls += ' neg semibold';
-  if (c.f === 'flag') cls += ' amber medium';
   if (c.f === 'status') cls += v === 'OPEN' ? ' accent medium' : v === 'SHORT' ? ' neg medium' : ' dim medium';
   return cls;
 }

@@ -331,8 +331,8 @@
             <span x-text='invalidSummary()'></span>
           </li>
           <li x-show='stats.dupRows'>
-            <span x-text='stats.dupRows'></span> duplicate rows removed (Exchange Order Id already seen in this
-            file or in an earlier import for this user).
+            <span x-text='stats.dupRows'></span> trades replaced by a newer row with the same Exchange Order Id
+            (same file or an earlier import).
           </li>
           <li x-show='shortN'>
             <span x-text='shortN'></span> symbol(s) have more sells than buys (SHORT) - check for missing earlier

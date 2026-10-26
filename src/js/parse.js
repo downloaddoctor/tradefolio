@@ -10,7 +10,8 @@ export const FIELDS = [
   { k: 'exchange', label: 'Exchange', h: 'exchange' },
   { k: 'orderId', label: 'Exchange Order Id', h: 'exchange order id' },
   { k: 'date', label: 'Execution date and time', h: 'execution date and time', req: 1 },
-  { k: 'status', label: 'Order status', h: 'order status', req: 1 }
+  { k: 'status', label: 'Order status', h: 'order status', req: 1 },
+  { k: 'user', label: 'Username', h: 'username' }
 ];
 
 function mkUtc(y, mo, d, h, mi, s) {
@@ -69,7 +70,7 @@ export function emptyStats() {
 }
 
 export function parseWorkbook(buf, fileName) {
-  const wb = XLSX.read(buf, { type: 'array' });
+  const wb = XLSX.read(buf, { type: 'array', raw: true });
   const known = FIELDS.map((f) => f.h);
   for (const name of wb.SheetNames) {
     const aoa = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: true, defval: '' });
@@ -104,13 +105,13 @@ export function parseWorkbook(buf, fileName) {
   throw new Error('Could not find a header row (expected columns like Stock name, Symbol, Type, Quantity...).');
 }
 
-export function buildTrades(pv, known) {
+export function buildTrades(pv) {
   const cm = pv.colMap;
   const stats = emptyStats();
   stats.file = pv.fileName;
   stats.importedAt = new Date().toLocaleString('en-IN');
   const trades = [];
-  const seen = new Set(known || []);
+  const seen = new Map();
   const get = (row, k) => { const i = cm[k]; return i == null || i < 0 ? '' : row[i]; };
   pv.dataRows.forEach((row, i) => {
     const rowNo = pv.headerRow + 1 + i;
@@ -142,11 +143,18 @@ export function buildTrades(pv, known) {
     const t = {
       key: 't' + trades.length, idx: trades.length, row: rowNo, stock, symbol: sym, sym, isin,
       type, qty, value, price: value / qty, exchange: toText(get(row, 'exchange')),
-      orderId, ts, dup: false
+      orderId, ts, user: toText(get(row, 'user'))
     };
     if (orderId) {
-      if (seen.has(orderId)) { stats.dupRows++; return; }
-      seen.add(orderId);
+      const at = seen.get(orderId);
+      if (at != null) {
+        stats.dupRows++;
+        t.key = trades[at].key;
+        t.idx = trades[at].idx;
+        trades[at] = t;
+        return;
+      }
+      seen.set(orderId, trades.length);
     }
     trades.push(t);
   });
