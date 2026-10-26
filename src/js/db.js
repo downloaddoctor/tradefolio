@@ -62,6 +62,10 @@ export async function loadDataset() {
   return { trades, stats: meta ? meta.value : emptyStats() };
 }
 
+export async function saveStats(stats) {
+  await db.meta.put({ id: 'stats', value: plain(stats) });
+}
+
 export async function clearDataset(user) {
   await db.transaction('rw', db.trades, db.meta, db.imports, async () => {
     if (!user) {

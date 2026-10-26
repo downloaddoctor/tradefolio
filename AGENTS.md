@@ -34,7 +34,7 @@ init() → loadDataset() from Dexie → recompute()
 src/js/format.js — INR/NUM formatters, EPS, norm, pad, fmtDate
 src/js/parse.js — FIELDS (headers → keys; req=1 required), parseDate/toNum/toText/normSymbol, emptyStats, parseWorkbook(buf,name) → preview (throws), buildTrades(preview) → {trades,stats}; uses global XLSX
 src/js/compute.js — compute(trades) pure: group by sym → chronological (ts, idx tiebreak) → FIFO + short lots → positions; totalsOf(positions)
-src/js/db.js — Dexie 'tradefolio'; saveDataset/saveImport/findImport(hash)/newImportId/loadDataset/clearDataset(user?)/saveCandles/loadCandles; uses global Dexie
+src/js/db.js — Dexie 'tradefolio'; saveDataset/saveImport/saveStats/findImport(hash)/newImportId/loadDataset/clearDataset(user?)/saveCandles/loadCandles; uses global Dexie
 src/js/columns.js — COLS per view (open, trades, summary) {k,label,f,n}; cell, cellClass
 src/js/sample.js — downloadSample (client-side xlsx)
 src/js/chart.js — drawSymbolChart(el, trades, candles, pos, opt{hideBuys,hideSells,hideVolume,allTrades})/destroyChart; no running avg series — only the 'Current avg' price line (pos.avgBuy = FIFO remaining lots, same as stats strip); Lightweight Charts v4 candlesticks + volume histogram + setMarkers (buy arrowUp green, sell arrowDown red) snapped to nearest earlier candle day; pos → createPriceLine 'Current avg' (violet, open positions only); no candles → executed-price line fallback; uses global LightweightCharts
@@ -53,6 +53,7 @@ Shell: #hdr is a fixed bottom-center dock (Data|Chart tabs + key/import/user/cle
 Tradefolio (Chart pane): #main → .tradefolio grid (lg: 272px sidebar + 1fr pane; must stay display:grid) → .side lists ALL positions open-first (sideList, click pick(sym)) → .pane head = ticker + status pill (cs{st,msg}) + stats strip (curPrice · net · avgBuy · realized) + Reload; drawSymbolChart(selTrades, candles, selPos); recompute auto-selects first OPEN position else positions[0]
 Import username: preview → Confirm import → askUser() → #usermodal (.modal-sm) → confirmImport() closes modal
 Import flow: file → SHA-256 → SheetJS read → header row autodetect (≥4 known headers) → preview + mapping → confirmImport (username required; findImport(hash,user) hit → 'Already imported for {user} as {id}') → trades[] tagged with new import id + user, appended to existing trades (merge, not replace) → compute → positions[] + totals; trade identity = Exchange Order Id (global, across users); a repeat (same file → buildTrades keeps the later row; earlier import of any user → confirmImport deletes the old trade via saveImport removeKeys) replaces the older one and counts in stats.dupRows
+Warnings panel has a dismiss cross → dismissWarnings() resets stats to emptyStats(), persists via db.saveStats, sets warnOff (hides the whole panel incl. live SHORT warning until next import or reload); warningCount() returns 0 while warnOff
 Only Order status 'Executed' rows kept; skipped/invalid/empty/replaced counts → stats → warnings panel
 Position status: OPEN net>0, CLOSED net=0, SHORT net<0
 costBasis = avgBuy × open qty; fifoCost = remaining FIFO lots cost

@@ -1,7 +1,7 @@
 import { INR, norm, fmtDate } from './format.js';
 import { parseWorkbook, buildTrades, emptyStats } from './parse.js';
 import { compute, totalsOf } from './compute.js';
-import { saveImport, saveTrades, findImport, newImportId, loadDataset, clearDataset } from './db.js';
+import { saveImport, saveTrades, saveStats, findImport, newImportId, loadDataset, clearDataset } from './db.js';
 import { COLS, cell, cellClass } from './columns.js';
 import { downloadSample } from './sample.js';
 import { drawSymbolChart, destroyChart } from './chart.js';
@@ -17,7 +17,7 @@ export function app() {
     drag: false, error: '', preview: null,
     trades: [], positions: [], stats: emptyStats(),
     totals: { openCount: 0, invested: 0, realized: 0, shortCount: 0 },
-    view: 'open', showAll: false, user: '', uname: '', hideShort: false, shortN: 0, shortSet: {}, shortList: [], fixPrice: {},
+    view: 'open', warnOff: false, showAll: false, user: '', uname: '', hideShort: false, shortN: 0, shortSet: {}, shortList: [], fixPrice: {},
     q: '', fType: '', fSym: '', dFrom: '', dTo: '',
     sorts: { open: { k: 'costBasis', d: -1 }, trades: { k: 'ts', d: -1 }, summary: { k: 'realized', d: -1 } },
     pane: 'data', keyOpen: false, userOpen: false, userModal: false,
@@ -354,6 +354,7 @@ export function app() {
         const gone = new Set(oldKeys);
         this.trades = this.trades.filter((t) => !gone.has(t.key)).concat(added);
         this.stats = stats;
+        this.warnOff = false;
         this.error = '';
         this.recompute();
       } catch (e) { this.error = 'Could not save to IndexedDB: ' + e.message; }
@@ -414,7 +415,13 @@ export function app() {
       this.recompute();
     },
 
+    async dismissWarnings() {
+      this.stats = emptyStats();
+      this.warnOff = true;
+      try { await saveStats(this.stats); } catch (e) { this.error = 'Could not save: ' + e.message; }
+    },
     warningCount() {
+      if (this.warnOff) return 0;
       const s = this.stats;
       return s.empty + s.skippedStatusTotal + s.invalid.length + s.dupRows + this.shortN;
     },

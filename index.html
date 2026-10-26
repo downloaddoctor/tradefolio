@@ -319,7 +319,9 @@
 
       <!-- warnings -->
       <details id='warnings' class='warnbox' x-data='warningsPanel' x-show='warningCount()'>
-        <summary>Import warnings (<span x-text='warningCount()'></span>)</summary>
+        <summary>Import warnings (<span x-text='warningCount()'></span>)
+          <button class='modal-close warn-x' @click.stop.prevent='dismissWarnings()' title='Dismiss warnings' aria-label='Dismiss warnings'>&times;</button>
+        </summary>
         <ul>
           <li x-show='stats.empty'><span x-text='stats.empty'></span> empty rows skipped</li>
           <li x-show='stats.skippedStatusTotal'>
