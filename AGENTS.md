@@ -2,9 +2,8 @@
 
 Tradefolio — single-page client-side app; imports broker trade xlsx/xls/csv → open positions, trades, realized P&L (FIFO)
 No backend; libs via CDN (not bundled), cached at runtime by service worker → offline after first online visit
-Build: 'npm run build' (esbuild + html-minifier-terser devDependencies) bundles src/js/ into dist/app.js; GitHub Pages serves dist/ via .github/workflows/pages.yml (npm ci). Local installs use pnpm (pnpm lock files are gitignored)
-Run source: 'python -m http.server' then http://localhost:8000 (ES modules + SW need http, not file://)
-Run build: 'pnpm run build' then 'python -m http.server 8000 --directory dist'
+Build: 'pnpm run build' (node scripts/build.mjs) bundles src/js/ into dist/app.js; 'pnpm test' runs node --test; package.json = local pnpm scripts + devDependency pins (esbuild, html-minifier-terser), pnpm-lock.yaml gitignored; .github/workflows/pages.yml does NOT use pnpm: it reads the pins from package.json, installs them via 'npm i --prefix ..', runs 'node --test', builds, deploys dist/ to GitHub Pages
+Run build: 'pnpm install' once, 'pnpm run build'; open dist/index.html in the browser
 
 # DIRECTORY
 
@@ -19,6 +18,7 @@ dist/ — build output, gitignored, deployed to Pages
 index.html
 sw.js
 package.json
+pnpm-workspace.yaml — allowBuilds esbuild (local pnpm)
 README.md
 AGENTS.md
 
